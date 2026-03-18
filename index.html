@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INCI in Ranges — Purlés (UK)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+:root {
+  --purple: #4B2856;
+  --purple-light: #6B3E7A;
+  --purple-bg: #F5F0F7;
+  --purple-border: #D4C4DC;
+  --beige: #EEECE1;
+  --gray-border: #D9D9D9;
+  --success: #2E7D32;
+  --error: #C62828;
+  --bg: #FAFAFA;
+  --card: #FFFFFF;
+  --text: #333333;
+  --text-light: #777777;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-width: 1024px;
+}
+
+header {
+  background: var(--purple);
+  color: white;
+  padding: 16px 40px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 2px 8px rgba(75,40,86,0.3);
+}
+
+header svg { flex-shrink: 0; }
+
+header h1 {
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+header .market-badge {
+  background: rgba(255,255,255,0.2);
+  border-radius: 6px;
+  padding: 3px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+header .subtitle {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 28px 32px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border: 1px solid #EEE;
+}
+
+.card h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--purple);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card h2 .step {
+  background: var(--purple);
+  color: white;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  flex-shrink: 0;
+}
+
+.card.disabled { opacity: 0.45; pointer-events: none; }
+
+/* Drop zone */
+#drop-zone {
+  border: 2px dashed var(--purple-border);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-light);
+  font-size: 15px;
+}
+
+#drop-zone:hover, #drop-zone.dragover {
+  border-color: var(--purple);
+  background: var(--purple-bg);
+  color: var(--purple);
+}
+
+#drop-zone .icon { font-size: 36px; margin-bottom: 8px; display: block; }
+
+#file-info {
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: var(--purple-bg);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+#file-info .filename {
+  font-weight: 600;
+  color: var(--purple);
+}
+
+#file-info .sheet-tags {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+#file-info .sheet-tag {
+  background: white;
+  border: 1px solid var(--purple-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--purple);
+}
+
+/* SKU input */
+#sku-input {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px 14px;
+  border: 1px solid #DDD;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+#sku-input:focus {
+  outline: none;
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(75,40,86,0.1);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--purple);
+  color: white;
+}
+
+.btn-primary:hover { background: var(--purple-light); }
+.btn-primary:disabled { background: #AAA; cursor: not-allowed; }
+
+.btn-success {
+  background: var(--success);
+  color: white;
+}
+
+.btn-success:hover { background: #388E3C; }
+
+.btn-outline {
+  background: white;
+  color: var(--purple);
+  border: 1px solid var(--purple);
+}
+
+.btn-outline:hover { background: var(--purple-bg); }
+
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.btn-row {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Tables */
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.result-table th {
+  background: var(--purple);
+  color: white;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.result-table th:first-child { border-radius: 6px 0 0 0; }
+.result-table th:last-child { border-radius: 0 6px 0 0; }
+
+.result-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid #EEE;
+}
+
+.result-table tr:nth-child(even) td { background: #FAFAFA; }
+
+.result-table .status-ok { color: var(--success); font-weight: 600; }
+.result-table .status-err { color: var(--error); font-weight: 600; }
+
+/* Warning */
+.warning {
+  background: #FFF3E0;
+  border: 1px solid #FFB74D;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #E65100;
+  margin-bottom: 12px;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s;
+}
+
+.modal-overlay.active { display: flex; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: white;
+  border-radius: 14px;
+  padding: 32px 36px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+  text-align: center;
+  animation: slideUp 0.25s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modal .modal-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.modal h3 {
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.modal .modal-body {
+  font-size: 14px;
+  color: var(--text-light);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.modal .modal-body .error-detail {
+  background: #FFF3E0;
+  border: 1px solid #FFB74D;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #E65100;
+  text-align: left;
+}
+
+.modal .btn-close-modal {
+  background: var(--purple);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 32px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.modal .btn-close-modal:hover { background: var(--purple-light); }
+
+/* Footer info */
+.app-footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 40px;
+  margin-bottom: 20px;
+}
+
+.app-footer .footer-bubble {
+  display: inline-block;
+  background: var(--purple);
+  color: rgba(255,255,255,0.75);
+  border-radius: 20px;
+  padding: 14px 32px;
+  box-shadow: 0 2px 8px rgba(75,40,86,0.25);
+}
+
+.app-footer .footer-bubble p { margin: 0; }
+.app-footer .footer-bubble p + p { margin-top: 4px; }
+
+.app-footer .footer-bubble .credit {
+  font-size: 13px;
+  color: white;
+}
+
+.app-footer a {
+  color: rgba(255,255,255,0.9);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.app-footer a:hover {
+  color: white;
+  text-decoration: underline;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="136" height="60" viewBox="0 0 136 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g clip-path="url(#clip0)">
+      <path d="M10.5 11.33c-3.17 0-6.76.8-8.35 1.86C.56 14.27 0 15.35 0 17.31v33.68c0 .54.22 1.19 1.25 1.19h.03l.03-.01c.55-.12 5.34-1.22 5.34-3.03V39.59c.8.45 2.52 1.21 4.92 1.21 3.95 0 7.25-1.71 9.57-4.93 1.98-2.77 3.12-6.6 3.12-10.52 0-8.91-5-14.01-13.74-14.01zM6.64 17.9c0-1.78 1.21-2.64 3.7-2.64 3.45 0 7.16 3.26 7.16 10.41 0 6.65-2.74 10.94-6.99 10.94-2.05 0-3.18-.65-3.86-1.18V17.9z" fill="white"/>
+      <path d="M50.05 11.9h-.04c-.55.08-5.41.84-5.41 2.7v18.77c0 1.64-.35 3.12-4.61 3.12-2.97 0-4.6-1.59-4.6-4.5V13.09c0-.8-.39-1.19-1.19-1.19h-.04c-.55.07-5.41.72-5.41 2.7v17.6c0 5.62 3.86 8.59 11.14 8.59 4.33 0 7.79-.88 9.29-1.74 1.44-.82 2.06-2.01 2.06-3.98V13.09c0-.8-.39-1.19-1.19-1.19z" fill="white"/>
+      <path d="M67.55 11.33c-3.53 0-6.66.85-8.26 1.57-1.71.79-2.35 1.78-2.35 3.61v22.45c0 .55.22 1.19 1.25 1.19h4.2c1.03 0 1.25-.55 1.25-1.19V17.69c0-1.52 1.13-2.43 3.01-2.43 1.39 0 1.94.74 2.51 1.51.58.79 1.25 1.68 2.81 1.68 1.75 0 2.84-1.13 2.84-2.95 0-1.25-.71-4.17-7.26-4.17z" fill="white"/>
+      <path d="M82.27 0h-.04c-.9.12-5.41.79-5.41 2.6v36.36c0 .8.39 1.19 1.19 1.19h4.26c.8 0 1.19-.39 1.19-1.19V1.19c0-.8-.39-1.19-1.19-1.19z" fill="white"/>
+      <path d="M97.61 9.25h1.55c.65 0 1.09-.39 1.53-.77l5.54-5.33c.25-.25.51-.7.51-1.05 0-.78-1.08-1.35-2.57-1.35-1.83 0-3.45.65-4.02 1.62l-3.15 5.03c-.04.08-.09.16-.12.22-.12.22-.23.42-.23.65 0 .1.06.16.17.16z" fill="white"/>
+      <path d="M109.48 29.95c-.64 0-1.25.42-1.63 1.1-.75 1.32-2.88 4.38-6.51 4.38-4.32 0-7.14-3.28-7.57-8.78l15.22-2.51c1.1-.16 1.84-.56 1.84-1.99 0-5.38-3.68-10.82-10.72-10.82-5.75 0-12.47 3.83-12.47 14.6 0 4.96 1.26 8.8 3.76 11.42 2.18 2.29 5.19 3.49 8.71 3.49 7.14 0 10.88-6.04 10.88-9.28 0-.88-.7-1.62-1.51-1.62zM99.48 15.26c3.93 0 4.81 3.59 4.97 5.91l-10.93 1.87c.28-3.82 1.98-7.78 5.96-7.78z" fill="white"/>
+      <path d="M126.92 23.5c-3.13-1.34-5.83-2.49-5.83-5.12 0-2.22 1.33-3.49 3.65-3.49s3.29 1.78 3.93 3.33c.47 1.23 1.59 1.99 2.93 1.99 1.63 0 2.69-1.05 2.69-2.68 0-2.5-3-6.2-9.44-6.2-6.02 0-9.92 3.18-9.92 8.11s4.14 6.58 7.8 8.2c3.08 1.36 5.98 2.64 5.98 5.42 0 2.46-1.87 3.76-3.7 3.76-2.56 0-3.7-1.54-4.63-3.86-.47-1.17-1.71-1.94-3.14-1.94-1.75 0-2.84 1.09-2.84 2.84 0 2.44 3.08 6.99 10.5 6.99 6.19 0 10.18-3.42 10.18-8.69s-4.33-7.02-8.16-8.66z" fill="white"/>
+    </g>
+    <defs><clipPath id="clip0"><rect width="135.076" height="60" fill="white"/></clipPath></defs>
+  </svg>
+  <div>
+    <h1>INCI in Ranges <span class="market-badge">&#127468;&#127463; UK</span></h1>
+    <div class="subtitle">Narzędzie do generowania INCI z przedziałami procentowymi — rynek UK</div>
+  </div>
+</header>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <div class="modal-icon" id="modal-icon"></div>
+    <h3 id="modal-title"></h3>
+    <div class="modal-body" id="modal-body"></div>
+    <button class="btn-close-modal" id="modal-close">OK</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- STEP 1: File upload -->
+  <div class="card" id="step1">
+    <h2><span class="step">1</span> Wgraj plik Excel</h2>
+    <div id="drop-zone">
+      <span class="icon">&#128196;</span>
+      Przeciągnij plik <strong>.xlsx</strong> tutaj lub kliknij, aby wybrać
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" hidden>
+    <div id="file-info" style="display:none"></div>
+  </div>
+
+  <!-- STEP 2: SKU input -->
+  <div class="card disabled" id="step2">
+    <h2><span class="step">2</span> Wpisz numery SKU</h2>
+    <textarea id="sku-input" placeholder="Wpisz numery SKU oddzielone przecinkami, spacjami lub nowymi liniami&#10;Przykład:&#10;44, 182&#10;97&#10;15.1"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="match-btn">Dopasuj arkusze</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Match results -->
+  <div class="card disabled" id="step3" style="display:none">
+    <h2><span class="step">3</span> Weryfikacja dopasowań</h2>
+    <div id="match-warnings"></div>
+    <table class="result-table" id="match-table">
+      <thead><tr><th>SKU</th><th>Arkusz</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="btn-row">
+      <button class="btn btn-success" id="generate-btn">Generuj dokumenty</button>
+      <button class="btn btn-outline" id="back-btn">Wróć do edycji SKU</button>
+    </div>
+  </div>
+
+  <div class="app-footer">
+    <div class="footer-bubble">
+      <p>Dane przetwarzane wyłącznie lokalnie w przeglądarce.</p>
+      <p class="credit">Designed by <strong>Kornel Skąpski</strong> for <a href="https://www.purles.pl" target="_blank" rel="noopener">Purlés</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS — UK RANGES
+// ============================================================
+const RANGES = [
+  { min: 75,  max: 100, label: ']75 - 100]' },
+  { min: 50,  max: 75,  label: ']50 - 75]' },
+  { min: 25,  max: 50,  label: ']25 - 50]' },
+  { min: 10,  max: 25,  label: ']10 - 25]' },
+  { min: 5,   max: 10,  label: ']5 - 10]' },
+  { min: 1,   max: 5,   label: ']1 - 5]' },
+  { min: 0.1, max: 1,   label: ']0,1 - 1]' },
+  { min: 0,   max: 0.1, label: '[0 - 0,1]' },
+];
+
+const EXACT_FUNCTIONS = ['preservative', 'perfuming', 'cosmetic colorant'];
+
+const COL_WIDTHS_MAIN = [1760, 2622, 2630, 1340, 908];
+const COL_WIDTHS_ALLERGEN = [3700, 3700, 1860];
+const TABLE_WIDTH = 9260;
+
+// ============================================================
+// STATE
+// ============================================================
+let workbook = null;
+let matchResults = []; // { sku, sheetName, status }
+let generatedFiles = {}; // sku -> Blob
+
+// ============================================================
+// HELPERS
+// ============================================================
+function cell(row, idx) {
+  if (!row || idx >= row.length) return null;
+  return row[idx];
+}
+
+function cellStr(row, idx) {
+  const v = cell(row, idx);
+  if (v == null) return '';
+  return String(v).replace(/^[\t\r\n]+/, '').trim();
+}
+
+// ============================================================
+// SKU PARSING
+// ============================================================
+function parseSkuInput(raw) {
+  const tokens = raw.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean);
+  const valid = [], invalid = [];
+  for (const t of tokens) {
+    if (/^\d+(\.\d+)?$/.test(t)) {
+      valid.push(t);
+    } else {
+      invalid.push(t);
+    }
+  }
+  return { valid: [...new Set(valid)], invalid };
+}
+
+// ============================================================
+// SHEET MATCHING
+// ============================================================
+function extractSkusFromSheetName(sheetName) {
+  const cleaned = sheetName.trim().replace(/\.$/, '');
+  return cleaned.split(/\s+/).filter(token => /^\d+(\.\d+)?$/.test(token));
+}
+
+function findSheetForSku(sku, wb) {
+  const skuStr = sku.trim();
+
+  // Pass 1: match by sheet name tokens
+  for (const name of wb.SheetNames) {
+    const tokens = extractSkusFromSheetName(name);
+    if (tokens.includes(skuStr)) return name;
+  }
+
+  // Pass 2: fallback — search product row inside each sheet
+  for (const name of wb.SheetNames) {
+    const ws = wb.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    for (let i = 0; i < Math.min(rows.length, 15); i++) {
+      const row = rows[i];
+      if (!row) continue;
+      for (let j = 0; j < row.length; j++) {
+        const c = row[j] != null ? String(row[j]).trim() : '';
+        if (!c) continue;
+        // Product row: contains " / " or starts with digit
+        if (c.includes(' / ') || /^\d/.test(c)) {
+          const rowTokens = c.split(/[\s/]+/).filter(t => /^\d+(\.\d+)?$/.test(t));
+          if (rowTokens.includes(skuStr)) return name;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// ============================================================
+// SHEET DATA PARSING
+// ============================================================
+function parseSheetData(ws) {
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+  // Find column indices from header row containing "CAS"
+  let headerIdx = -1;
+  let ci = { cas: -1, inciUE: -1, inciUSA: -1, func: -1, pct: -1 };
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    for (let j = 0; j < row.length; j++) {
+      if (row[j] != null && String(row[j]).trim() === 'CAS') {
+        headerIdx = i;
+        ci.cas = j;
+        // Find other columns in the same row
+        for (let k = 0; k < row.length; k++) {
+          const v = row[k] != null ? String(row[k]).trim() : '';
+          if (v === 'INCI UE') ci.inciUE = k;
+          if (v === 'INCI USA') ci.inciUSA = k;
+          if (v === 'FUNCTION') ci.func = k;
+          if (v === '% INCI') ci.pct = k;
+        }
+        break;
+      }
+    }
+    if (headerIdx >= 0) break;
+  }
+
+  if (headerIdx < 0) return null;
+
+  // Extract ingredient rows + sum row
+  const ingredients = [];
+  let sumRow = null;
+  let dataEndIdx = rows.length;
+
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+
+    const cas = cellStr(row, ci.cas);
+    const inciUE = cellStr(row, ci.inciUE);
+    const inciUSA = cellStr(row, ci.inciUSA);
+    const func = cellStr(row, ci.func);
+    const pctRaw = cell(row, ci.pct);
+
+    // Sum row detection: %INCI ~ 100 and other fields empty
+    if (pctRaw != null) {
+      const numCheck = typeof pctRaw === 'number' ? pctRaw : parseFloat(pctRaw);
+      if (!isNaN(numCheck) && Math.abs(numCheck - 100) < 0.01 && !inciUE) {
+        sumRow = { cas: '', inciUE: '', inciUSA: '', function: '', pctRaw: pctRaw };
+        dataEndIdx = i;
+        break;
+      }
+    }
+
+    // End of data: all key fields empty
+    if (!cas && !inciUE && pctRaw == null) {
+      dataEndIdx = i;
+      break;
+    }
+
+    // Skip rows that are completely empty except stray cells
+    if (!cas && !inciUE && !inciUSA && !func && pctRaw == null) continue;
+
+    ingredients.push({ cas, inciUE, inciUSA, function: func, pctRaw });
+  }
+
+  // Find allergen section
+  let allergenTexts = [];
+  let allergens = [];
+
+  for (let i = dataEndIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+
+    // Check all cells for allergen keywords
+    let foundAllergen = false;
+    for (let j = 0; j < row.length; j++) {
+      const v = cellStr(row, j);
+      if (v.includes('Allergen') || v.includes('Extended List')) {
+        foundAllergen = true;
+        allergenTexts.push(v);
+        break;
+      }
+    }
+
+    if (!foundAllergen) continue;
+
+    // Read subsequent text lines and find allergen table
+    for (let j = i + 1; j < rows.length; j++) {
+      const aRow = rows[j];
+      if (!aRow) continue;
+
+      // Check if this row is the allergen table header
+      let allergenHeaderFound = false;
+      let aci = { inciUE: -1, inciUSA: -1, pct: -1 };
+
+      for (let k = 0; k < aRow.length; k++) {
+        const v = aRow[k] != null ? String(aRow[k]).trim() : '';
+        if (v === 'INCI UE') aci.inciUE = k;
+        if (v === 'INCI USA') aci.inciUSA = k;
+        if (v === '% INCI') aci.pct = k;
+      }
+
+      if (aci.inciUE >= 0) {
+        allergenHeaderFound = true;
+        // Read allergen data rows
+        for (let m = j + 1; m < rows.length; m++) {
+          const dRow = rows[m];
+          if (!dRow) continue;
+          const aInciUE = cellStr(dRow, aci.inciUE);
+          if (!aInciUE) break;
+          const aInciUSA = cellStr(dRow, aci.inciUSA);
+          const aPct = cell(dRow, aci.pct);
+          allergens.push({ inciUE: aInciUE, inciUSA: aInciUSA, pctRaw: aPct });
+        }
+        break;
+      } else {
+        // Might be additional text (e.g., "Leave on product")
+        const lineText = aRow.map((c, idx) => cellStr(aRow, idx)).filter(Boolean).join(' ');
+        if (lineText) allergenTexts.push(lineText);
+      }
+    }
+    break;
+  }
+
+  return { ingredients, sumRow, allergenTexts, allergens };
+}
+
+// ============================================================
+// VALUE CONVERSION — UK LOGIC
+// ============================================================
+function valueToRange(x) {
+  if (x === 0) return '[0 - 0,1]';
+  for (const r of RANGES) {
+    if (x > r.min && x <= r.max) return r.label;
+  }
+  return String(x);
+}
+
+function isExactFunction(funcStr) {
+  const f = (funcStr || '').toLowerCase();
+  return EXACT_FUNCTIONS.some(ef => f.includes(ef));
+}
+
+function hasAcidInName(inciUE) {
+  return /\bACID\b/i.test(inciUE || '');
+}
+
+function convertPercentValue(rawValue, funcStr, inciUE) {
+  // Already a range string
+  if (typeof rawValue === 'string' && /^[\[\]]/.test(rawValue.trim())) {
+    return rawValue.trim();
+  }
+
+  const numVal = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue).replace(',', '.'));
+  if (isNaN(numVal)) return rawValue != null ? String(rawValue) : '';
+
+  // Exact functions: preservative, perfuming, cosmetic colorant
+  if (isExactFunction(funcStr)) {
+    return numVal.toFixed(6).replace('.', ',');
+  }
+
+  // Exact value for ACID-containing INCI UE names
+  if (hasAcidInName(inciUE)) {
+    return numVal.toFixed(6).replace('.', ',');
+  }
+
+  return valueToRange(numVal);
+}
+
+function formatSumValue(rawValue) {
+  const numVal = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue).replace(',', '.'));
+  if (isNaN(numVal)) return rawValue != null ? String(rawValue) : '';
+  return numVal.toFixed(6).replace('.', ',');
+}
+
+function formatAllergenValue(rawValue) {
+  if (rawValue == null) return '';
+  if (typeof rawValue === 'string') return rawValue.replace('.', ',');
+  // Number: convert to string preserving original precision, then replace dot
+  return String(rawValue).replace('.', ',');
+}
+
+// ============================================================
+// DOCX GENERATION
+// ============================================================
+function createBorder() {
+  return {
+    style: docx.BorderStyle.SINGLE,
+    size: 8,
+    color: 'D9D9D9',
+  };
+}
+
+function allBorders() {
+  const b = createBorder();
+  return { top: b, bottom: b, left: b, right: b };
+}
+
+function makeCell(text, width, opts = {}) {
+  const { bold, italics, alignment, shading, isHeader } = opts;
+  return new docx.TableCell({
+    children: [
+      new docx.Paragraph({
+        children: [
+          new docx.TextRun({
+            text: text || '',
+            font: 'Times New Roman',
+            size: 18, // 9pt
+            bold: bold || false,
+            italics: italics || false,
+            color: isHeader ? '000000' : '010101',
+          }),
+        ],
+        alignment: alignment || docx.AlignmentType.LEFT,
+        spacing: { after: 0, line: 240 },
+      }),
+    ],
+    width: { size: width, type: docx.WidthType.DXA },
+    borders: allBorders(),
+    shading: shading ? { fill: shading, type: docx.ShadingType.CLEAR, color: 'auto' } : undefined,
+    verticalAlign: docx.VerticalAlign.CENTER,
+    margins: { top: 40, bottom: 40, left: 70, right: 70 },
+  });
+}
+
+function makeMainHeaderRow() {
+  const headers = ['CAS', 'INCI UE', 'INCI USA', 'FUNCTION', '% INCI'];
+  return new docx.TableRow({
+    children: headers.map((h, i) =>
+      makeCell(h, COL_WIDTHS_MAIN[i], {
+        bold: true,
+        italics: true,
+        alignment: docx.AlignmentType.CENTER,
+        shading: 'EEECE1',
+        isHeader: true,
+      })
+    ),
+    height: { value: 300, rule: docx.HeightRule.AT_LEAST },
+  });
+}
+
+function makeMainDataRow(ingredient, rowIndex) {
+  const pctDisplay = convertPercentValue(ingredient.pctRaw, ingredient.function, ingredient.inciUE);
+  const altFill = rowIndex % 2 === 1 ? 'F7F5F2' : undefined;
+
+  const cells = [
+    makeCell(ingredient.cas, COL_WIDTHS_MAIN[0], { shading: altFill }),
+    makeCell(ingredient.inciUE, COL_WIDTHS_MAIN[1], { shading: altFill }),
+    makeCell(ingredient.inciUSA, COL_WIDTHS_MAIN[2], { shading: altFill }),
+    makeCell(ingredient.function, COL_WIDTHS_MAIN[3], {
+      alignment: docx.AlignmentType.CENTER,
+      shading: altFill,
+    }),
+    makeCell(pctDisplay, COL_WIDTHS_MAIN[4], {
+      alignment: docx.AlignmentType.RIGHT,
+      shading: altFill,
+    }),
+  ];
+
+  return new docx.TableRow({
+    children: cells,
+    height: { value: 300, rule: docx.HeightRule.AT_LEAST },
+  });
+}
+
+function makeSumRow(sumRowData, rowIndex) {
+  const pctDisplay = formatSumValue(sumRowData.pctRaw);
+  const altFill = rowIndex % 2 === 1 ? 'F7F5F2' : undefined;
+
+  return new docx.TableRow({
+    children: [
+      makeCell(' ', COL_WIDTHS_MAIN[0], { shading: altFill }),
+      makeCell('', COL_WIDTHS_MAIN[1], { shading: altFill }),
+      makeCell('', COL_WIDTHS_MAIN[2], { shading: altFill }),
+      makeCell('', COL_WIDTHS_MAIN[3], { shading: altFill }),
+      makeCell(pctDisplay, COL_WIDTHS_MAIN[4], {
+        alignment: docx.AlignmentType.RIGHT,
+        shading: altFill,
+      }),
+    ],
+    height: { value: 300, rule: docx.HeightRule.AT_LEAST },
+  });
+}
+
+function makeAllergenHeaderRow() {
+  const headers = ['INCI UE', 'INCI USA', '% INCI'];
+  return new docx.TableRow({
+    children: headers.map((h, i) =>
+      makeCell(h, COL_WIDTHS_ALLERGEN[i], {
+        bold: true,
+        italics: true,
+        alignment: docx.AlignmentType.CENTER,
+        shading: 'EEECE1',
+        isHeader: true,
+      })
+    ),
+    height: { value: 300, rule: docx.HeightRule.AT_LEAST },
+  });
+}
+
+function makeAllergenDataRow(allergen, rowIndex) {
+  const pctDisplay = formatAllergenValue(allergen.pctRaw);
+  const altFill = rowIndex % 2 === 1 ? 'F7F5F2' : undefined;
+
+  return new docx.TableRow({
+    children: [
+      makeCell(allergen.inciUE, COL_WIDTHS_ALLERGEN[0], { shading: altFill }),
+      makeCell(allergen.inciUSA, COL_WIDTHS_ALLERGEN[1], { shading: altFill }),
+      makeCell(pctDisplay, COL_WIDTHS_ALLERGEN[2], {
+        alignment: docx.AlignmentType.RIGHT,
+        shading: altFill,
+      }),
+    ],
+    height: { value: 300, rule: docx.HeightRule.AT_LEAST },
+  });
+}
+
+async function generateDocxForSheet(ws) {
+  const data = parseSheetData(ws);
+  if (!data) throw new Error('Nie udało się sparsować arkusza');
+
+  const mainRows = [makeMainHeaderRow()];
+  data.ingredients.forEach((ing, i) => mainRows.push(makeMainDataRow(ing, i)));
+  if (data.sumRow) mainRows.push(makeSumRow(data.sumRow, data.ingredients.length));
+
+  const mainTable = new docx.Table({
+    rows: mainRows,
+    width: { size: TABLE_WIDTH, type: docx.WidthType.DXA },
+    columnWidths: COL_WIDTHS_MAIN,
+  });
+
+  const children = [mainTable];
+
+  // Allergen table — values unchanged (no range conversion)
+  if (data.allergens.length > 0) {
+    children.push(new docx.Paragraph({ children: [], spacing: { before: 200, after: 200 } }));
+    const allergenRows = [makeAllergenHeaderRow()];
+    data.allergens.forEach((a, i) => allergenRows.push(makeAllergenDataRow(a, i)));
+    children.push(new docx.Table({
+      rows: allergenRows,
+      width: { size: TABLE_WIDTH, type: docx.WidthType.DXA },
+      columnWidths: COL_WIDTHS_ALLERGEN,
+    }));
+  }
+
+  const doc = new docx.Document({
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 },
+          margin: { top: 1008, right: 1008, bottom: 1008, left: 1008 },
+        },
+      },
+      children,
+    }],
+  });
+
+  return docx.Packer.toBlob(doc);
+}
+
+// ============================================================
+// UI LOGIC
+// ============================================================
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileInfo = document.getElementById('file-info');
+const skuInput = document.getElementById('sku-input');
+const matchBtn = document.getElementById('match-btn');
+const matchWarnings = document.getElementById('match-warnings');
+const matchTableBody = document.querySelector('#match-table tbody');
+const generateBtn = document.getElementById('generate-btn');
+const backBtn = document.getElementById('back-btn');
+const step2 = document.getElementById('step2');
+const step3 = document.getElementById('step3');
+
+function pluralize(n, one, few, many) {
+  if (n === 1) return one;
+  const lastTwo = n % 100;
+  const lastOne = n % 10;
+  if (lastOne >= 2 && lastOne <= 4 && (lastTwo < 12 || lastTwo > 14)) return few;
+  return many;
+}
+
+function scrollTo(el) {
+  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+// --- Modal ---
+const modalOverlay = document.getElementById('modal-overlay');
+const modalIcon = document.getElementById('modal-icon');
+const modalTitle = document.getElementById('modal-title');
+const modalBody = document.getElementById('modal-body');
+const modalClose = document.getElementById('modal-close');
+
+function showModal(icon, title, bodyHtml) {
+  modalIcon.textContent = icon;
+  modalTitle.textContent = title;
+  modalBody.innerHTML = bodyHtml;
+  modalOverlay.classList.add('active');
+}
+
+modalClose.addEventListener('click', () => modalOverlay.classList.remove('active'));
+modalOverlay.addEventListener('click', (e) => {
+  if (e.target === modalOverlay) modalOverlay.classList.remove('active');
+});
+
+// --- File Upload ---
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  if (!file.name.match(/\.xlsx?$/i)) {
+    alert('Proszę wybrać plik .xlsx');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+    } catch (err) {
+      alert('Błąd odczytu pliku Excel: ' + err.message);
+      return;
+    }
+
+    const names = workbook.SheetNames;
+    fileInfo.style.display = 'block';
+    const sheetWord = pluralize(names.length, 'arkusz', 'arkusze', 'arkuszy');
+    fileInfo.innerHTML = `
+      <span class="filename">${file.name}</span> — ${names.length} ${sheetWord}
+      <div class="sheet-tags">
+        ${names.map(n => `<span class="sheet-tag">${n}</span>`).join('')}
+      </div>
+    `;
+
+    step2.classList.remove('disabled');
+    step3.style.display = 'none';
+    generatedFiles = {};
+    scrollTo(step2);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// --- SKU Matching ---
+matchBtn.addEventListener('click', () => {
+  if (!workbook) return;
+
+  const { valid, invalid } = parseSkuInput(skuInput.value);
+  matchWarnings.innerHTML = '';
+
+  if (invalid.length) {
+    matchWarnings.innerHTML = `<div class="warning">Zignorowane tokeny (nieprawidłowy format SKU): <strong>${invalid.join(', ')}</strong></div>`;
+  }
+
+  if (!valid.length) {
+    matchWarnings.innerHTML += `<div class="warning">Nie podano żadnych prawidłowych numerów SKU.</div>`;
+    return;
+  }
+
+  matchResults = valid.map(sku => {
+    const sheetName = findSheetForSku(sku, workbook);
+    return {
+      sku,
+      sheetName: sheetName || null,
+      status: sheetName ? 'ok' : 'error',
+    };
+  });
+
+  matchTableBody.innerHTML = matchResults.map(r => `
+    <tr>
+      <td><strong>${r.sku}</strong></td>
+      <td>${r.sheetName || '—'}</td>
+      <td class="${r.status === 'ok' ? 'status-ok' : 'status-err'}">
+        ${r.status === 'ok' ? 'OK' : 'Nie znaleziono'}
+      </td>
+    </tr>
+  `).join('');
+
+  const hasAnyOk = matchResults.some(r => r.status === 'ok');
+  generateBtn.disabled = !hasAnyOk;
+
+  step3.style.display = 'block';
+  step3.classList.remove('disabled');
+  generatedFiles = {};
+  scrollTo(step3);
+});
+
+// --- Back to edit ---
+backBtn.addEventListener('click', () => {
+  step3.style.display = 'none';
+  scrollTo(step2);
+});
+
+// --- Generate DOCX & auto-download ---
+generateBtn.addEventListener('click', async () => {
+  const okResults = matchResults.filter(r => r.status === 'ok');
+  if (!okResults.length) return;
+
+  generateBtn.disabled = true;
+  generateBtn.innerHTML = '<span class="spinner"></span> Generowanie...';
+
+  generatedFiles = {};
+  const errors = [];
+
+  for (const r of okResults) {
+    try {
+      const ws = workbook.Sheets[r.sheetName];
+      const blob = await generateDocxForSheet(ws);
+      const filename = `INCI in ranges UK - ${r.sku}.docx`;
+      generatedFiles[r.sku] = { blob, filename };
+    } catch (err) {
+      errors.push(`SKU ${r.sku}: ${err.message}`);
+    }
+  }
+
+  generateBtn.disabled = false;
+  generateBtn.innerHTML = 'Generuj dokumenty';
+
+  const fileEntries = Object.entries(generatedFiles);
+  const successCount = fileEntries.length;
+  const errorCount = errors.length;
+
+  // Auto-download
+  if (successCount > 0) {
+    if (successCount === 1) {
+      const [, { blob, filename }] = fileEntries[0];
+      saveAs(blob, filename);
+    } else {
+      const zip = new JSZip();
+      for (const [, { blob, filename }] of fileEntries) {
+        zip.file(filename, blob);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      saveAs(zipBlob, 'INCI in ranges UK.zip');
+    }
+  }
+
+  // Show modal with status
+  if (successCount > 0 && errorCount === 0) {
+    const fileWord = pluralize(successCount, 'plik', 'pliki', 'plików');
+    const format = successCount === 1 ? '.docx' : '.zip';
+    showModal(
+      '\u2705',
+      'Gotowe!',
+      `Wygenerowano <strong>${successCount}</strong> ${fileWord} i pobrano jako <strong>${format}</strong>.`
+    );
+  } else if (successCount > 0 && errorCount > 0) {
+    showModal(
+      '\u26A0\uFE0F',
+      'Częściowy sukces',
+      `Wygenerowano <strong>${successCount}</strong> z ${successCount + errorCount} plików.<div class="error-detail">${errors.join('<br>')}</div>`
+    );
+  } else {
+    showModal(
+      '\u274C',
+      'Błąd generowania',
+      `Nie udało się wygenerować żadnego pliku.<div class="error-detail">${errors.join('<br>')}</div>`
+    );
+  }
+});
+</script>
+</body>
+</html>
