@@ -55,12 +55,21 @@ header h1 {
 }
 
 header .market-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: rgba(255,255,255,0.2);
   border-radius: 6px;
   padding: 3px 14px;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 1px;
+}
+
+header .market-badge img {
+  height: 18px;
+  border-radius: 2px;
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
 }
 
 header .subtitle {
@@ -405,7 +414,7 @@ header .subtitle {
     <defs><clipPath id="clip0"><rect width="135.076" height="60" fill="white"/></clipPath></defs>
   </svg>
   <div>
-    <h1>INCI in Ranges <span class="market-badge">&#127468;&#127463; UK</span></h1>
+    <h1>INCI in Ranges <span class="market-badge"><img src="uk.png" alt="UK"> UK</span></h1>
     <div class="subtitle">Narzędzie do generowania INCI z przedziałami procentowymi — rynek UK</div>
   </div>
 </header>
@@ -713,23 +722,27 @@ function hasAcidInName(inciUE) {
 }
 
 function convertPercentValue(rawValue, funcStr, inciUE) {
-  // Already a range string
+  const needsExact = isExactFunction(funcStr) || hasAcidInName(inciUE);
+
+  // Try to parse as number first
+  let numVal = NaN;
+  if (typeof rawValue === 'number') {
+    numVal = rawValue;
+  } else if (rawValue != null) {
+    numVal = parseFloat(String(rawValue).replace(',', '.'));
+  }
+
+  // Exact value for special functions (preservative, perfuming, colorant) and ACID names
+  if (needsExact && !isNaN(numVal)) {
+    return numVal.toFixed(6).replace('.', ',');
+  }
+
+  // Already a range string — return as-is (only for non-exact cases)
   if (typeof rawValue === 'string' && /^[\[\]]/.test(rawValue.trim())) {
     return rawValue.trim();
   }
 
-  const numVal = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue).replace(',', '.'));
   if (isNaN(numVal)) return rawValue != null ? String(rawValue) : '';
-
-  // Exact functions: preservative, perfuming, cosmetic colorant
-  if (isExactFunction(funcStr)) {
-    return numVal.toFixed(6).replace('.', ',');
-  }
-
-  // Exact value for ACID-containing INCI UE names
-  if (hasAcidInName(inciUE)) {
-    return numVal.toFixed(6).replace('.', ',');
-  }
 
   return valueToRange(numVal);
 }
