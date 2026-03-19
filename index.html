@@ -627,14 +627,24 @@ function parseSheetData(ws) {
       }
     }
 
-    // End of data: all key fields empty
-    if (!cas && !inciUE && pctRaw == null) {
-      dataEndIdx = i;
-      break;
+    // Stop if we hit allergen section
+    let hitAllergen = false;
+    for (let j = 0; j < row.length; j++) {
+      const v = cellStr(row, j);
+      if (v.includes('Allergen') || v.includes('Extended List')) { hitAllergen = true; break; }
     }
+    if (hitAllergen) { dataEndIdx = i; break; }
 
-    // Skip rows that are completely empty except stray cells
+    // Skip completely empty rows (spacing in Excel)
     if (!cas && !inciUE && !inciUSA && !func && pctRaw == null) continue;
+
+    // Multi-CAS continuation row: has CAS but no INCI/FUNCTION/% data
+    if (cas && !inciUE && !inciUSA && !func && pctRaw == null) {
+      if (ingredients.length > 0) {
+        ingredients[ingredients.length - 1].cas += '\n' + cas;
+      }
+      continue;
+    }
 
     ingredients.push({ cas, inciUE, inciUSA, function: func, pctRaw });
   }
@@ -778,23 +788,25 @@ function allBorders() {
 
 function makeCell(text, width, opts = {}) {
   const { bold, italics, alignment, shading, isHeader } = opts;
+  const lines = (text || '').split(/\r?\n/);
+  const paragraphs = lines.map(line =>
+    new docx.Paragraph({
+      children: [
+        new docx.TextRun({
+          text: line,
+          font: 'Times New Roman',
+          size: 18, // 9pt
+          bold: bold || false,
+          italics: italics || false,
+          color: isHeader ? '000000' : '010101',
+        }),
+      ],
+      alignment: alignment || docx.AlignmentType.LEFT,
+      spacing: { after: 0, line: 240 },
+    })
+  );
   return new docx.TableCell({
-    children: [
-      new docx.Paragraph({
-        children: [
-          new docx.TextRun({
-            text: text || '',
-            font: 'Times New Roman',
-            size: 18, // 9pt
-            bold: bold || false,
-            italics: italics || false,
-            color: isHeader ? '000000' : '010101',
-          }),
-        ],
-        alignment: alignment || docx.AlignmentType.LEFT,
-        spacing: { after: 0, line: 240 },
-      }),
-    ],
+    children: paragraphs,
     width: { size: width, type: docx.WidthType.DXA },
     borders: allBorders(),
     shading: shading ? { fill: shading, type: docx.ShadingType.CLEAR, color: 'auto' } : undefined,
